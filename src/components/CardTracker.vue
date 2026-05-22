@@ -3,12 +3,13 @@
     <header class="header">
       <h1>Adrenalyn XL</h1>
       <div class="drive-buttons">
-        <button @click="restoreFromDrive" class="btn-sync btn-restore" :disabled="isSyncing">
-          Restaurar desde Drive
+        <button @click="triggerFileInput" class="btn-sync btn-restore">
+          Restaurar Backup
         </button>
-        <button @click="backupToDrive" class="btn-sync" :disabled="isSyncing">
-          {{ isSyncing ? 'Sincronizando...' : 'Respaldar en Drive' }}
+        <button @click="downloadBackup" class="btn-sync">
+          Descargar Backup
         </button>
+        <input type="file" ref="fileInput" @change="handleFileUpload" accept=".json" style="display: none" />
       </div>
     </header>
 
@@ -74,7 +75,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useCardStore } from '../stores/cards'
 
 const store = useCardStore()
-const isSyncing = ref(false)
 
 // Estado de las pestañas
 const activeTab = ref<'all' | 'missing' | 'duplicates'>('all')
@@ -97,11 +97,6 @@ const filteredCollection = computed(() => {
   })
 })
 
-// Reemplaza esto con el Client ID de tu proyecto en Google Cloud Console
-const GOOGLE_CLIENT_ID = 'TU_CLIENT_ID_AQUÍ.apps.googleusercontent.com'
-// Reemplaza esto con tu API Key de Google Cloud Console
-const GOOGLE_API_KEY = 'TU_API_KEY_AQUÍ'
-
 onMounted(async () => {
   await store.loadFromDB()
   
@@ -112,16 +107,6 @@ onMounted(async () => {
       store.collection = JSON.parse(localData)
     }
   }
-  // Cargar el script de Google API Client para el Picker
-  const script = document.createElement('script')
-  script.src = 'https://apis.google.com/js/api.js'
-  script.async = true
-  script.defer = true
-  script.onload = () => {
-    // @ts-ignore
-    gapi.load('picker', () => {})
-  }
-  document.body.appendChild(script)
 })
 
 // Guardar automáticamente en localStorage cada vez que haya un cambio
@@ -129,127 +114,51 @@ watch(() => store.collection, (newCollection) => {
   localStorage.setItem('adrenalyn_local_backup', JSON.stringify(newCollection))
 }, { deep: true })
 
-const backupToDrive = () => {
-  isSyncing.value = true
+// --- SISTEMA DE BACKUP LOCAL (SIN BACKEND) ---
+const downloadBackup = () => {
+  const dataStr = JSON.stringify(store.collection, null, 2)
+  const blob = new Blob([dataStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
   
-  // @ts-ignore - 'google' es inyectado globalmente por el script en index.html
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly',
-    callback: async (response: any) => {
-      if (response.access_token) {
-        await uploadJsonToDrive(response.access_token)
-      } else {
-        isSyncing.value = false
-        alert('Error obteniendo token de Google')
-      }
-    },
-    error_callback: () => {
-      isSyncing.value = false
-      alert('Error en la autenticación')
-    }
-  })
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `adrenalyn_backup_${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(link)
+  link.click()
   
-  client.requestAccessToken()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
-const uploadJsonToDrive = async (token: string) => {
-  try {
-    const fileContent = JSON.stringify(store.collection)
-    const metadata = {
-      name: 'adrenalyn_backup.json',
-      mimeType: 'application/json'
-    }
+const fileInput = ref<HTMLInputElement | null>(null)
 
-    const form = new FormData()
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-    form.append('file', new Blob([fileContent], { type: 'application/json' }))
-
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${token}` 
-      },
-      body: form
-    })
-
-    if (res.ok) {
-      alert('Respaldo exitoso en Drive')
-    } else {
-      throw new Error('Error al subir a Drive')
-    }
-  } catch (error) {
-    console.error(error)
-    alert('Falló el respaldo')
-  } finally {
-    isSyncing.value = false
-  }
+const triggerFileInput = () => {
+  fileInput.value?.click()
 }
 
-const restoreFromDrive = () => {
-  // @ts-ignore
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.readonly',
-    callback: (tokenResponse: any) => {
-      if (tokenResponse && tokenResponse.access_token) {
-        createPicker(tokenResponse.access_token)
-      }
-    }
-  })
-  client.requestAccessToken()
-}
+const handleFileUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
 
-const createPicker = (accessToken: string) => {
-  // @ts-ignore
-  const view = new google.picker.View(google.picker.ViewId.DOCS)
-  view.setMimeTypes('application/json')
-
-  // @ts-ignore
-  const picker = new google.picker.PickerBuilder()
-    .setAppId(GOOGLE_CLIENT_ID.split('-')[0]) // No es el client ID completo, solo el número de proyecto
-    .setOAuthToken(accessToken)
-    .addView(view)
-    .setDeveloperKey(GOOGLE_API_KEY)
-    .setCallback(pickerCallback)
-    .build()
-  picker.setVisible(true)
-}
-
-const pickerCallback = async (data: any) => {
-  // @ts-ignore
-  if (data[google.picker.Action.PICKED]) {
-    // @ts-ignore
-    const doc = data[google.picker.Response.DOCUMENTS][0]
-    const fileId = doc.id
-
-    // @ts-ignore
-    const token = gapi.client.getToken().access_token
-    if (!token) {
-      alert('No se pudo obtener el token para descargar el archivo.')
-      return
-    }
-
+  const reader = new FileReader()
+  reader.onload = (e) => {
     try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!res.ok) throw new Error('Error al descargar el archivo desde Drive.')
-
-      const collectionData = await res.json()
-
-      if (confirm('¿Estás seguro de que quieres reemplazar tu colección actual con los datos del respaldo? Esta acción no se puede deshacer.')) {
-        store.collection = collectionData
+      const content = e.target?.result as string
+      const parsedData = JSON.parse(content)
+      
+      if (confirm('¿Estás seguro de que quieres reemplazar tu colección actual con los datos del archivo seleccionado? Esta acción no se puede deshacer.')) {
+        store.collection = parsedData
         alert('Colección restaurada exitosamente.')
       }
     } catch (error) {
+      alert('El archivo seleccionado no tiene un formato válido.')
       console.error(error)
-      alert('Error al procesar el archivo de respaldo.')
     }
+    // Limpiamos el input para permitir volver a cargar el mismo archivo
+    target.value = ''
   }
+  reader.readAsText(file)
 }
 
 // Lógica para inicializar álbum
