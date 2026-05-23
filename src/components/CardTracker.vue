@@ -65,6 +65,7 @@
           <button @click="store.decrement(card.id)" :disabled="card.owned === 0" class="btn btn-minus">-</button>
           <span class="card-count" :class="{'has-duplicates': card.owned > 1}">{{ card.owned }}</span>
           <button @click="store.increment(card.id)" class="btn btn-plus">+</button>
+          <button @click="deleteCard(card.id)" class="btn btn-delete">🗑️</button>
         </div>
       </div>
     </div>
@@ -253,14 +254,20 @@ const processBulkDuplicates = () => {
   ids.forEach(id => {
     const card = store.collection.find(c => String(c.id).toLowerCase() === String(id).toLowerCase())
     if (card) {
-      store.increment(card.id)
+      if (card.owned === 0) {
+        // Si no la tenías, para que sea "repetida" debes tener mínimo 2 (1 en álbum, 1 extra)
+        store.increment(card.id)
+        store.increment(card.id)
+      } else {
+        store.increment(card.id)
+      }
       agregadas++
     } else {
-          // Si no existe, la agregamos sumando estrictamente 1
+      // Si no existe, la agregamos con 2 para que cuente como repetida
       store.collection.push({
         id: String(id),
         name: `Carta ${id}`,
-            owned: 1
+        owned: 2
       })
       agregadas++
     }
@@ -271,6 +278,16 @@ const processBulkDuplicates = () => {
   }
 
   bulkDuplicatesInput.value = ''
+}
+
+// Lógica para eliminar carta
+const deleteCard = (id: string | number) => {
+  if (confirm('¿Estás seguro de que quieres eliminar esta carta completamente de la colección?')) {
+    const index = store.collection.findIndex(c => String(c.id) === String(id))
+    if (index !== -1) {
+      store.collection.splice(index, 1)
+    }
+  }
 }
 </script>
 
@@ -465,6 +482,15 @@ const processBulkDuplicates = () => {
 .btn-plus {
   background-color: #e8f5e9;
   color: #2e7d32;
+}
+
+.btn-delete {
+  background-color: #ffcdd2;
+  color: #c62828;
+}
+
+.btn-delete:hover {
+  background-color: #ef9a9a;
 }
 
 .card-count {
