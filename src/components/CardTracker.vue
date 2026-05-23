@@ -256,11 +256,11 @@ const processBulkDuplicates = () => {
       store.increment(card.id)
       agregadas++
     } else {
-      // Si no existe, la agregamos directamente como repetida
+          // Si no existe, la agregamos sumando estrictamente 1
       store.collection.push({
         id: String(id),
         name: `Carta ${id}`,
-        owned: 2
+            owned: 1
       })
       agregadas++
     }
