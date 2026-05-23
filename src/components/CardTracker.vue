@@ -46,13 +46,20 @@
       </button>
     </div>
 
+    <!-- Paginador -->
+    <div class="pagination" v-if="totalPages > 1">
+      <button @click="prevPage" :disabled="currentPage === 1" class="btn-page">Anterior</button>
+      <span>Pág {{ currentPage }} / {{ totalPages }}</span>
+      <button @click="nextPage" :disabled="currentPage === totalPages" class="btn-page">Siguiente</button>
+    </div>
+
     <div class="card-list">
       <!-- Mensaje si la lista está vacía -->
       <div v-if="filteredCollection.length === 0" class="empty-state">
         No hay cartas en esta sección.
       </div>
 
-      <div v-for="card in filteredCollection" :key="card.id" :class="['card-item', `design-${card.design || 'normal'}`]">
+      <div v-for="card in paginatedCollection" :key="card.id" :class="['card-item', `design-${card.design || 'normal'}`]">
         <div class="card-info">
           <span class="card-id">#{{ card.id }}</span>
           <input 
@@ -119,6 +126,26 @@ const filteredCollection = computed(() => {
   })
 })
 
+// --- LÓGICA DE PAGINACIÓN ---
+const currentPage = ref(1)
+const itemsPerPage = ref(30)
+
+// Al cambiar de pestaña volvemos a la primera página
+watch(activeTab, () => {
+  currentPage.value = 1
+})
+
+const totalPages = computed(() => Math.ceil(filteredCollection.value.length / itemsPerPage.value))
+
+const paginatedCollection = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredCollection.value.slice(start, end)
+})
+
+const prevPage = () => { if (currentPage.value > 1) currentPage.value-- }
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
+
 // --- LÓGICA DE INTERFAZ (Toasts y Modals) ---
 const toast = ref({ show: false, message: '', type: 'info' })
 let toastTimeout: ReturnType<typeof setTimeout>
@@ -152,6 +179,11 @@ onMounted(async () => {
 
   // --- MIGRACIÓN: Actualizar cartas específicas si ya existen en el localData ---
   store.collection.forEach(card => {
+    // Asignar normal por defecto si no tiene diseño, sin sobreescribir
+    if (!card.design) {
+      card.design = 'normal'
+    }
+
     const info = getCardDefaultInfo(card.id)
     // Si el nombre sigue siendo el genérico, le ponemos el real
     if (info.name !== `Carta ${card.id}` && card.name === `Carta ${card.id}`) {
@@ -493,15 +525,22 @@ const deleteCard = (id: string | number) => {
   font-weight: bold;
 }
 
+.card-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
 .card-item {
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
+  padding: 0.5rem;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  margin-bottom: 0.5rem;
   transition: background 0.3s, border-color 0.3s;
+  text-align: center;
 }
 
 .design-normal {
@@ -510,8 +549,31 @@ const deleteCard = (id: string | number) => {
 }
 
 .design-epica {
-  background-color: #f3e5f5;
-  border-color: #9c27b0;
+  background: linear-gradient(135deg, #555555 0%, #1a1a1a 50%, #333333 100%);
+  border-color: #888888;
+  color: white;
+}
+
+.design-epica .card-id,
+.design-epica .card-count {
+  color: #eee;
+}
+
+.design-epica .card-name-input {
+  color: white;
+}
+
+.design-epica .card-name-input::placeholder {
+  color: #aaa;
+}
+
+.design-epica .card-design-select {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.design-epica .has-duplicates {
+  color: #64b5f6;
 }
 
 .design-holografica {
@@ -523,6 +585,8 @@ const deleteCard = (id: string | number) => {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  width: 100%;
+  align-items: center;
 }
 
 .card-id {
@@ -533,10 +597,12 @@ const deleteCard = (id: string | number) => {
 .card-name-input {
   border: 1px solid transparent;
   background: transparent;
-  font-size: 1.1rem;
+  font-size: 0.85rem;
   font-weight: 500;
   padding: 0.2rem;
   width: 100%;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .card-name-input:focus {
@@ -549,21 +615,25 @@ const deleteCard = (id: string | number) => {
   border-radius: 4px;
   border: 1px solid #ccc;
   padding: 0.2rem;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   background-color: rgba(255, 255, 255, 0.6);
   color: #333;
+  width: 100%;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 .btn {
-  width: 40px;
-  height: 40px;
-  font-size: 1.5rem;
+  width: 28px;
+  height: 28px;
+  font-size: 1.1rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -597,14 +667,38 @@ const deleteCard = (id: string | number) => {
 }
 
 .card-count {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: bold;
-  min-width: 30px;
+  min-width: 20px;
   text-align: center;
 }
 
 .has-duplicates {
   color: #1976d2;
+}
+
+/* --- ESTILOS DE PAGINACIÓN --- */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.btn-page {
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+.btn-page:disabled {
+  background-color: #a0c1f9;
 }
 
 /* --- ESTILOS PARA POPUPS Y MODALES --- */
