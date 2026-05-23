@@ -5,6 +5,7 @@ export interface Card {
     id: string;
     name: string;
     owned: number;
+    design?: string;
 }
 
 export const useCardStore = defineStore('cards', {
