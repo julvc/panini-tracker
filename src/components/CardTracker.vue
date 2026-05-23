@@ -52,7 +52,7 @@
         No hay cartas en esta sección.
       </div>
 
-      <div v-for="card in filteredCollection" :key="card.id" class="card-item">
+      <div v-for="card in filteredCollection" :key="card.id" :class="['card-item', `design-${card.design || 'normal'}`]">
         <div class="card-info">
           <span class="card-id">#{{ card.id }}</span>
           <input 
@@ -60,6 +60,11 @@
             class="card-name-input" 
             placeholder="Sin nombre (Editar)" 
           />
+          <select v-model="card.design" class="card-design-select">
+            <option value="normal">Normal</option>
+            <option value="epica">Épica</option>
+            <option value="holografica">Holográfica</option>
+          </select>
         </div>
         <div class="card-actions">
           <button @click="store.decrement(card.id)" :disabled="card.owned === 0" class="btn btn-minus">-</button>
@@ -144,6 +149,19 @@ onMounted(async () => {
       store.collection = JSON.parse(localData)
     }
   }
+
+  // --- MIGRACIÓN: Actualizar cartas específicas si ya existen en el localData ---
+  store.collection.forEach(card => {
+    const info = getCardDefaultInfo(card.id)
+    // Si el nombre sigue siendo el genérico, le ponemos el real
+    if (info.name !== `Carta ${card.id}` && card.name === `Carta ${card.id}`) {
+      card.name = info.name
+    }
+    // Forzar el diseño holográfico para la 623 en caso de que esté normal
+    if (String(card.id) === '623') {
+      card.design = 'holografica'
+    }
+  })
 })
 
 // Guardar automáticamente en localStorage cada vez que haya un cambio
@@ -201,6 +219,23 @@ const handleFileUpload = (event: Event) => {
 // Lógica para inicializar álbum
 const albumSizeInput = ref('')
 
+// Función para pre-cargar nombres y diseños especiales
+const getCardDefaultInfo = (id: string | number) => {
+  const idStr = String(id)
+  let name = `Carta ${idStr}`
+  let design = 'normal'
+
+  switch (idStr) {
+    case '296': name = 'HIRVING LOZANO'; break;
+    case '521': name = 'PIERRE-EMILE'; break;
+    case '523': name = 'MIKKEL DAMS'; break;
+    case '541': name = 'DEJAN KULUSEVSKI'; break;
+    case '623': name = 'PAU CUBARSI'; design = 'holografica'; break;
+  }
+
+  return { name, design }
+}
+
 const initializeAlbum = () => {
   const size = Number(albumSizeInput.value)
   if (isNaN(size) || size <= 0) return alert('Por favor, ingresa un número válido.')
@@ -211,7 +246,8 @@ const initializeAlbum = () => {
     const idStr = String(i)
     const exists = store.collection.find(c => String(c.id).toLowerCase() === idStr.toLowerCase())
     if (!exists) {
-      store.collection.push({ id: idStr, name: `Carta ${idStr}`, owned: 0 })
+        const info = getCardDefaultInfo(idStr)
+        store.collection.push({ id: idStr, name: info.name, owned: 0, design: info.design })
       agregadas++
     }
   }
@@ -265,10 +301,12 @@ const processBulkOwned = () => {
       }
     } else {
       // Si la carta no existe, la creamos y la agregamos a la colección
+      const info = getCardDefaultInfo(id)
       store.collection.push({
         id: String(id),
-        name: `Carta ${id}`,
-        owned: 1
+        name: info.name,
+        owned: 1,
+        design: info.design
       })
       agregadas++
     }
@@ -300,10 +338,12 @@ const processBulkDuplicates = () => {
       agregadas++
     } else {
       // Si no existe, la agregamos con 2 para que cuente como repetida
+      const info = getCardDefaultInfo(id)
       store.collection.push({
         id: String(id),
-        name: `Carta ${id}`,
-        owned: 2
+        name: info.name,
+        owned: 2,
+        design: info.design
       })
       agregadas++
     }
@@ -458,14 +498,31 @@ const deleteCard = (id: string | number) => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border: 1px solid #ddd;
+  border: 2px solid #e0e0e0;
   border-radius: 8px;
   margin-bottom: 0.5rem;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.design-normal {
+  background-color: #fff;
+  border-color: #e0e0e0;
+}
+
+.design-epica {
+  background-color: #f3e5f5;
+  border-color: #9c27b0;
+}
+
+.design-holografica {
+  background: linear-gradient(135deg, #e0f7fa 0%, #fce4ec 50%, #e8eaf6 100%);
+  border-color: #00bcd4;
 }
 
 .card-info {
   display: flex;
   flex-direction: column;
+  gap: 0.3rem;
 }
 
 .card-id {
@@ -486,6 +543,15 @@ const deleteCard = (id: string | number) => {
   border-bottom: 1px solid #4285f4;
   outline: none;
   background: #fff;
+}
+
+.card-design-select {
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  padding: 0.2rem;
+  font-size: 0.85rem;
+  background-color: rgba(255, 255, 255, 0.6);
+  color: #333;
 }
 
 .card-actions {
