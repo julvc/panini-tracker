@@ -69,6 +69,22 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast Notification (Mensajes de aviso rápidos) -->
+    <div v-if="toast.show" class="toast" :class="toast.type">
+      {{ toast.message }}
+    </div>
+
+    <!-- Confirm Modal (Ventana de confirmación) -->
+    <div v-if="confirmDialog.show" class="modal-overlay">
+      <div class="modal-content">
+        <p>{{ confirmDialog.message }}</p>
+        <div class="modal-actions">
+          <button @click="closeConfirm" class="modal-btn btn-cancel">Cancelar</button>
+          <button @click="executeConfirm" class="modal-btn btn-confirm">Aceptar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 <script setup lang="ts">
@@ -97,6 +113,26 @@ const filteredCollection = computed(() => {
     return String(a.id).localeCompare(String(b.id))
   })
 })
+
+// --- LÓGICA DE INTERFAZ (Toasts y Modals) ---
+const toast = ref({ show: false, message: '', type: 'info' })
+let toastTimeout: ReturnType<typeof setTimeout>
+
+const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  toast.value = { show: true, message, type }
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => { toast.value.show = false }, 3500)
+}
+
+const confirmDialog = ref({ show: false, message: '', onConfirm: () => {} })
+const showConfirm = (message: string, onConfirm: () => void) => {
+  confirmDialog.value = { show: true, message, onConfirm }
+}
+const closeConfirm = () => { confirmDialog.value.show = false }
+const executeConfirm = () => {
+  confirmDialog.value.onConfirm()
+  closeConfirm()
+}
 
 onMounted(async () => {
   await store.loadFromDB()
@@ -148,12 +184,12 @@ const handleFileUpload = (event: Event) => {
       const content = e.target?.result as string
       const parsedData = JSON.parse(content)
       
-      if (confirm('¿Estás seguro de que quieres reemplazar tu colección actual con los datos del archivo seleccionado? Esta acción no se puede deshacer.')) {
+      showConfirm('¿Estás seguro de que quieres reemplazar tu colección con los datos de este archivo? Esta acción no se puede deshacer.', () => {
         store.collection = parsedData
-        alert('Colección restaurada exitosamente.')
-      }
+        showToast('Colección restaurada exitosamente.', 'success')
+      })
     } catch (error) {
-      alert('El archivo seleccionado no tiene un formato válido.')
+      showToast('El archivo seleccionado no tiene un formato válido.', 'error')
       console.error(error)
     }
     // Limpiamos el input para permitir volver a cargar el mismo archivo
@@ -239,9 +275,9 @@ const processBulkOwned = () => {
   })
 
   if (agregadas > 0) {
-    alert(`¡Éxito! Se agregaron o marcaron ${agregadas} cartas como obtenidas.`)
+    showToast(`¡Éxito! Se marcaron ${agregadas} cartas como obtenidas.`, 'success')
   } else if (yaExistian > 0) {
-    alert(`No se agregó nada nuevo. Las cartas ingresadas ya las tenías registradas.`)
+    showToast(`Las cartas ingresadas ya las tenías registradas.`, 'info')
   }
 
   bulkOwnedInput.value = ''
@@ -274,7 +310,7 @@ const processBulkDuplicates = () => {
   })
 
   if (agregadas > 0) {
-    alert(`¡Éxito! Se añadieron ${agregadas} cartas repetidas.`)
+    showToast(`¡Éxito! Se añadieron ${agregadas} cartas repetidas.`, 'success')
   }
 
   bulkDuplicatesInput.value = ''
@@ -282,12 +318,13 @@ const processBulkDuplicates = () => {
 
 // Lógica para eliminar carta
 const deleteCard = (id: string | number) => {
-  if (confirm('¿Estás seguro de que quieres eliminar esta carta completamente de la colección?')) {
+  showConfirm('¿Seguro que quieres eliminar esta carta de tu colección?', () => {
     const index = store.collection.findIndex(c => String(c.id) === String(id))
     if (index !== -1) {
       store.collection.splice(index, 1)
+      showToast('Carta eliminada.', 'info')
     }
-  }
+  })
 }
 </script>
 
@@ -503,4 +540,72 @@ const deleteCard = (id: string | number) => {
 .has-duplicates {
   color: #1976d2;
 }
+
+/* --- ESTILOS PARA POPUPS Y MODALES --- */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: bold;
+  font-size: 0.95rem;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  text-align: center;
+  width: 90%;
+  max-width: 400px;
+  animation: fadeInDown 0.3s ease-out;
+}
+
+.toast.success { background-color: #34a853; }
+.toast.error { background-color: #ea4335; }
+.toast.info { background-color: #4285f4; }
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 1.8rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 350px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  gap: 1rem;
+}
+
+.modal-btn {
+  padding: 0.8rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+  flex: 1;
+}
+
+.btn-cancel { background-color: #e0e0e0; color: #333; }
+.btn-confirm { background-color: #ea4335; color: white; }
 </style>
