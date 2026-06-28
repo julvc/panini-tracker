@@ -8,21 +8,15 @@ export interface Card {
     design?: string;
 }
 
-// Generamos un ID de dispositivo único para aislar la data (funciona como user_id pero sin login)
-const getDeviceId = () => {
-    let deviceId = localStorage.getItem('device_id')
-    if (!deviceId) {
-        deviceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)
-        localStorage.setItem('device_id', deviceId)
-    }
-    return deviceId
-}
+// Usamos un ID fijo para que la base de datos sea el Centro de la Verdad Global
+const GLOBAL_ID = 'julvc-collection'
 
 export const useCardStore = defineStore('cards', {
     state: () => ({
         collection: [] as Card[],
         isLoaded: false,
-        deviceId: getDeviceId()
+        deviceId: GLOBAL_ID,
+        isAdmin: localStorage.getItem('isAdmin') === 'true'
     }),
     getters: {
         totalCards: (state) => state.collection.reduce((acc, card) => acc + card.owned, 0),

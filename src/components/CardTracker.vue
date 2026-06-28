@@ -25,7 +25,7 @@
       <button @click="shareDuplicates" class="btn-action btn-whatsapp">📲 Compartir</button>
     </div>
 
-    <div class="bulk-actions">
+    <div class="bulk-actions" v-if="store.isAdmin">
       <h3>Carga Rápida y Configuración</h3>
       <div class="bulk-input-group">
         <input v-model="albumSizeInput" type="number" placeholder="Total de cartas del álbum (Ej: 630)" />
@@ -74,18 +74,24 @@
             class="card-name-input" 
             placeholder="Sin nombre (Editar)" 
             @change="store.saveCardToDB(card)"
+            :readonly="!store.isAdmin"
           />
-          <select v-model="card.design" class="card-design-select" @change="store.saveCardToDB(card)">
+          <select v-model="card.design" class="card-design-select" @change="store.saveCardToDB(card)" :disabled="!store.isAdmin">
             <option value="normal">Normal</option>
             <option value="epica">Épica</option>
             <option value="holografica">Holográfica</option>
           </select>
         </div>
-        <div class="card-actions">
+        
+        <!-- Controles para usuarios -->
+        <div class="card-actions" v-if="store.isAdmin">
           <button @click="store.decrement(card.id)" :disabled="card.owned === 0" class="btn btn-minus">-</button>
           <span class="card-count" :class="{'has-duplicates': card.owned > 1}">{{ card.owned }}</span>
           <button @click="store.increment(card.id)" class="btn btn-plus">+</button>
           <button @click="deleteCard(card.id)" class="btn btn-delete">🗑️</button>
+        </div>
+        <div class="card-count-readonly" v-else>
+          <span>Posees: <strong>{{ card.owned }}</strong></span>
         </div>
       </div>
     </div>
@@ -178,6 +184,16 @@ const executeConfirm = () => {
 }
 
 onMounted(async () => {
+  // Comprobar si entró con la URL secreta de Admin
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('admin') === 'julvc') {
+    localStorage.setItem('isAdmin', 'true')
+    store.isAdmin = true
+  } else if (urlParams.get('admin') === 'logout') {
+    localStorage.removeItem('isAdmin')
+    store.isAdmin = false
+  }
+
   await store.loadFromDB()
   
   // Recuperar de localStorage si la base de datos de la store no cargó nada
