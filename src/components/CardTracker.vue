@@ -101,6 +101,29 @@
       {{ toast.message }}
     </div>
 
+    <div class="footer-actions">
+      <button v-if="!store.isAdmin" @click="showLoginModal = true" class="btn-login-trigger">🔒 Acceso Admin</button>
+      <button v-else @click="handleLogout" class="btn-logout-trigger">🔓 Cerrar Sesión</button>
+    </div>
+
+    <!-- Login Modal -->
+    <div v-if="showLoginModal" class="modal-overlay" @click="showLoginModal = false">
+      <div class="modal-content login-modal" @click.stop>
+        <h3>🔐 Acceso Administrativo</h3>
+        <p>Solo el dueño del álbum puede iniciar sesión para modificar el inventario.</p>
+        <form @submit.prevent="handleLogin" class="login-form">
+          <input type="email" v-model="loginEmail" placeholder="Correo electrónico" required class="login-input" />
+          <input type="password" v-model="loginPassword" placeholder="Contraseña" required class="login-input" />
+          <div class="modal-buttons">
+            <button type="button" class="btn-cancel" @click="showLoginModal = false">Cancelar</button>
+            <button type="submit" class="btn-confirm" :disabled="isLoggingIn">
+              {{ isLoggingIn ? 'Entrando...' : 'Iniciar Sesión' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Confirm Modal (Ventana de confirmación) -->
     <div v-if="confirmDialog.show" class="modal-overlay">
       <div class="modal-content">
@@ -167,6 +190,33 @@ const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.v
 const toast = ref({ show: false, message: '', type: 'info' })
 let toastTimeout: ReturnType<typeof setTimeout>
 
+// Modal de Login
+const showLoginModal = ref(false)
+const loginEmail = ref('')
+const loginPassword = ref('')
+const isLoggingIn = ref(false)
+
+const handleLogin = async () => {
+  if (!loginEmail.value || !loginPassword.value) return
+  isLoggingIn.value = true
+  try {
+    await store.login(loginEmail.value, loginPassword.value)
+    showToast('Sesión iniciada correctamente', 'success')
+    showLoginModal.value = false
+    loginEmail.value = ''
+    loginPassword.value = ''
+  } catch (error) {
+    showToast('Credenciales incorrectas', 'error')
+  } finally {
+    isLoggingIn.value = false
+  }
+}
+
+const handleLogout = async () => {
+  await store.logout()
+  showToast('Sesión cerrada', 'info')
+}
+
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   toast.value = { show: true, message, type }
   if (toastTimeout) clearTimeout(toastTimeout)
@@ -184,16 +234,7 @@ const executeConfirm = () => {
 }
 
 onMounted(async () => {
-  // Comprobar si entró con la URL secreta de Admin
-  const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.get('admin') === 'julvc') {
-    localStorage.setItem('isAdmin', 'true')
-    store.isAdmin = true
-  } else if (urlParams.get('admin') === 'logout') {
-    localStorage.removeItem('isAdmin')
-    store.isAdmin = false
-  }
-
+  await store.checkAuth()
   await store.loadFromDB()
   
   // Recuperar de localStorage si la base de datos de la store no cargó nada
@@ -674,6 +715,45 @@ const deleteCard = (id: string | number) => {
 .tab-btn.active {
   background-color: #4285f4;
   color: white;
+}
+
+.tab-btn.toast-info {
+  background-color: #2196f3;
+  color: white;
+}
+
+/* Login y Footer */
+.footer-actions {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #ddd;
+}
+.btn-login-trigger, .btn-logout-trigger {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.btn-login-trigger:hover, .btn-logout-trigger:hover {
+  color: #333;
+}
+.login-modal {
+  max-width: 350px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+}
+.login-input {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
 }
 
 .empty-state {

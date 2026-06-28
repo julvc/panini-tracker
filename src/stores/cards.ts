@@ -16,13 +16,26 @@ export const useCardStore = defineStore('cards', {
         collection: [] as Card[],
         isLoaded: false,
         deviceId: GLOBAL_ID,
-        isAdmin: localStorage.getItem('isAdmin') === 'true'
+        isAdmin: false
     }),
     getters: {
         totalCards: (state) => state.collection.reduce((acc, card) => acc + card.owned, 0),
         duplicates: (state) => state.collection.filter(c => c.owned > 1),
     },
     actions: {
+        async checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession()
+            this.isAdmin = !!session
+        },
+        async login(email: string, password: string) {
+            const { error } = await supabase.auth.signInWithPassword({ email, password })
+            if (error) throw error
+            this.isAdmin = true
+        },
+        async logout() {
+            await supabase.auth.signOut()
+            this.isAdmin = false
+        },
         async loadFromDB() {
             const { data, error } = await supabase
                 .from('user_cards')
