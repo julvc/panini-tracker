@@ -18,6 +18,13 @@
       <p>Repetidas: {{ store.duplicates.length }}</p>
     </div>
 
+    <!-- NUEVA SECCIÓN DE ACCIONES PARA REPETIDAS -->
+    <div class="share-actions" v-if="store.duplicates.length > 0">
+      <button @click="exportDuplicatesXlsx" class="btn-action btn-excel">📊 Excel (XLSX)</button>
+      <button @click="exportDuplicatesPdf" class="btn-action btn-pdf">📕 Exportar PDF</button>
+      <button @click="shareDuplicates" class="btn-action btn-whatsapp">📲 Compartir</button>
+    </div>
+
     <div class="bulk-actions">
       <h3>Carga Rápida y Configuración</h3>
       <div class="bulk-input-group">
@@ -66,8 +73,9 @@
             v-model="card.name" 
             class="card-name-input" 
             placeholder="Sin nombre (Editar)" 
+            @change="store.saveCardToDB(card)"
           />
-          <select v-model="card.design" class="card-design-select">
+          <select v-model="card.design" class="card-design-select" @change="store.saveCardToDB(card)">
             <option value="normal">Normal</option>
             <option value="epica">Épica</option>
             <option value="holografica">Holográfica</option>
@@ -102,6 +110,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useCardStore } from '../stores/cards'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 const store = useCardStore()
 
@@ -196,11 +207,6 @@ onMounted(async () => {
   })
 })
 
-// Guardar automáticamente en localStorage cada vez que haya un cambio
-watch(() => store.collection, (newCollection) => {
-  localStorage.setItem('adrenalyn_local_backup', JSON.stringify(newCollection))
-}, { deep: true })
-
 // --- SISTEMA DE BACKUP LOCAL (SIN BACKEND) ---
 const downloadBackup = () => {
   const dataStr = JSON.stringify(store.collection, null, 2)
@@ -215,6 +221,97 @@ const downloadBackup = () => {
   
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+// --- NUEVO: Exportar Repetidas a Excel (XLSX) ---
+const exportDuplicatesXlsx = () => {
+  const duplicates = store.duplicates
+  if (duplicates.length === 0) {
+    showToast('No tienes cartas repetidas para exportar.', 'info')
+    return
+  }
+  
+  const data = duplicates.map(c => ({
+    ID: `#${c.id}`,
+    Nombre: c.name,
+    'Cantidad Extra': c.owned > 1 ? c.owned - 1 : 0,
+    Diseño: c.design || 'normal'
+  }))
+
+  const worksheet = XLSX.utils.json_to_sheet(data)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Repetidas")
+  
+  XLSX.writeFile(workbook, `repetidas_adrenalyn_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  showToast('Archivo Excel generado exitosamente.', 'success')
+}
+
+// --- NUEVO: Exportar Repetidas a PDF ---
+const exportDuplicatesPdf = () => {
+  const duplicates = store.duplicates
+  if (duplicates.length === 0) {
+    showToast('No tienes cartas repetidas para exportar.', 'info')
+    return
+  }
+  
+  const doc = new jsPDF()
+  doc.text('Mis Cartas Repetidas - Adrenalyn XL', 14, 15)
+  
+  const tableData = duplicates.map(c => [
+    `#${c.id}`, 
+    c.name, 
+    String(c.owned > 1 ? c.owned - 1 : 0),
+    c.design || 'normal'
+  ])
+  
+  autoTable(doc, {
+    startY: 20,
+    head: [['ID', 'Nombre', 'Cantidad Extra', 'Diseño']],
+    body: tableData,
+    styles: { font: 'helvetica' },
+    headStyles: { fillColor: [66, 133, 244] }
+  })
+  
+  doc.save(`repetidas_adrenalyn_${new Date().toISOString().slice(0, 10)}.pdf`)
+  showToast('Archivo PDF generado exitosamente.', 'success')
+}
+
+// --- NUEVO: Compartir con Web Share API ---
+const shareDuplicates = async () => {
+  const duplicates = store.duplicates
+  if (duplicates.length === 0) {
+    showToast('No tienes cartas repetidas para compartir.', 'info')
+    return
+  }
+  
+  let textContent = '¡Hola! Estas son mis cartas repetidas de Adrenalyn XL:\n\n'
+  duplicates.forEach(c => {
+    const extra = c.owned > 1 ? c.owned - 1 : 0
+    textContent += `▪️ #${c.id} ${c.name} (x${extra})\n`
+  })
+  textContent += '\n¿Te sirve alguna para cambiar?'
+  
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Mis Repetidas Adrenalyn XL',
+        text: textContent
+      })
+      showToast('¡Compartido con éxito!', 'success')
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+         showToast('Error al intentar compartir.', 'error')
+      }
+    }
+  } else {
+    // Fallback por si el navegador no soporta Web Share API (ej. PC)
+    try {
+      await navigator.clipboard.writeText(textContent)
+      showToast('Texto copiado al portapapeles. ¡Pégalo donde quieras!', 'success')
+    } catch(err) {
+      showToast('Tu navegador no soporta compartir ni copiar.', 'error')
+    }
+  }
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -234,9 +331,9 @@ const handleFileUpload = (event: Event) => {
       const content = e.target?.result as string
       const parsedData = JSON.parse(content)
       
-      showConfirm('¿Estás seguro de que quieres reemplazar tu colección con los datos de este archivo? Esta acción no se puede deshacer.', () => {
-        store.collection = parsedData
-        showToast('Colección restaurada exitosamente.', 'success')
+      showConfirm('¿Estás seguro de que quieres reemplazar tu colección con los datos de este archivo? Esta acción no se puede deshacer.', async () => {
+        await store.restoreCollection(parsedData)
+        showToast('Colección restaurada y sincronizada con Supabase.', 'success')
       })
     } catch (error) {
       showToast('El archivo seleccionado no tiene un formato válido.', 'error')
@@ -268,7 +365,7 @@ const getCardDefaultInfo = (id: string | number) => {
   return { name, design }
 }
 
-const initializeAlbum = () => {
+const initializeAlbum = async () => {
   const size = Number(albumSizeInput.value)
   if (isNaN(size) || size <= 0) return alert('Por favor, ingresa un número válido.')
   if (!confirm(`¿Quieres crear las cartas del 1 al ${size} marcadas como faltantes? (No sobreescribirá las que ya tienes)`)) return
@@ -284,6 +381,9 @@ const initializeAlbum = () => {
     }
   }
   
+  if (agregadas > 0) {
+    await store.saveAllToDB()
+  }
   alert(`Se han generado ${agregadas} cartas nuevas en la sección "Me faltan".`)
   albumSizeInput.value = ''
 }
@@ -316,17 +416,16 @@ const parseCardIds = (input: string): string[] => {
   return result
 }
 
-const processBulkOwned = () => {
+const processBulkOwned = async () => {
   const ids = parseCardIds(bulkOwnedInput.value)
   let agregadas = 0
   let yaExistian = 0
 
-  ids.forEach(id => {
-    // toLowerCase() ayuda a que coincida si por ejemplo escribes arg1 y en la bd es ARG1
+  for (const id of ids) {
     const card = store.collection.find(c => String(c.id).toLowerCase() === String(id).toLowerCase())
     if (card) {
       if (card.owned === 0) {
-        store.increment(card.id)
+        card.owned++
         agregadas++
       } else {
         yaExistian++
@@ -342,9 +441,10 @@ const processBulkOwned = () => {
       })
       agregadas++
     }
-  })
+  }
 
   if (agregadas > 0) {
+    await store.saveAllToDB()
     showToast(`¡Éxito! Se marcaron ${agregadas} cartas como obtenidas.`, 'success')
   } else if (yaExistian > 0) {
     showToast(`Las cartas ingresadas ya las tenías registradas.`, 'info')
@@ -353,23 +453,20 @@ const processBulkOwned = () => {
   bulkOwnedInput.value = ''
 }
 
-const processBulkDuplicates = () => {
+const processBulkDuplicates = async () => {
   const ids = parseCardIds(bulkDuplicatesInput.value)
   let agregadas = 0
 
-  ids.forEach(id => {
+  for (const id of ids) {
     const card = store.collection.find(c => String(c.id).toLowerCase() === String(id).toLowerCase())
     if (card) {
       if (card.owned === 0) {
-        // Si no la tenías, para que sea "repetida" debes tener mínimo 2 (1 en álbum, 1 extra)
-        store.increment(card.id)
-        store.increment(card.id)
+        card.owned += 2
       } else {
-        store.increment(card.id)
+        card.owned++
       }
       agregadas++
     } else {
-      // Si no existe, la agregamos con 2 para que cuente como repetida
       const info = getCardDefaultInfo(id)
       store.collection.push({
         id: String(id),
@@ -379,9 +476,10 @@ const processBulkDuplicates = () => {
       })
       agregadas++
     }
-  })
+  }
 
   if (agregadas > 0) {
+    await store.saveAllToDB()
     showToast(`¡Éxito! Se añadieron ${agregadas} cartas repetidas.`, 'success')
   }
 
@@ -390,12 +488,9 @@ const processBulkDuplicates = () => {
 
 // Lógica para eliminar carta
 const deleteCard = (id: string | number) => {
-  showConfirm('¿Seguro que quieres eliminar esta carta de tu colección?', () => {
-    const index = store.collection.findIndex(c => String(c.id) === String(id))
-    if (index !== -1) {
-      store.collection.splice(index, 1)
-      showToast('Carta eliminada.', 'info')
-    }
+  showConfirm('¿Seguro que quieres eliminar esta carta de tu colección?', async () => {
+    await store.deleteCard(String(id))
+    showToast('Carta eliminada.', 'info')
   })
 }
 </script>
@@ -438,6 +533,60 @@ const deleteCard = (id: string | number) => {
 
 .btn-sync:disabled {
   background-color: #a0c1f9;
+}
+
+/* Estilos para Compartir y Exportar */
+.share-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  background-color: #607d8b;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.btn-action:hover {
+  transform: translateY(-2px);
+  background-color: #546e7a;
+}
+
+.btn-whatsapp {
+  background-color: #25d366;
+}
+
+.btn-whatsapp:hover {
+  background-color: #128c7e;
+}
+
+.btn-excel {
+  background-color: #217346;
+}
+
+.btn-excel:hover {
+  background-color: #1a5c38;
+}
+
+.btn-pdf {
+  background-color: #d32f2f;
+}
+
+.btn-pdf:hover {
+  background-color: #b71c1c;
 }
 
 /* Estilos para Carga Rápida */
