@@ -9,7 +9,8 @@ export interface Card {
 }
 
 // Usamos un ID fijo para que la base de datos sea el Centro de la Verdad Global
-const GLOBAL_ID = 'julvc-collection'
+// Debe ser formato UUID válido porque la columna en Supabase es tipo UUID
+const GLOBAL_ID = '11111111-1111-1111-1111-111111111111'
 
 export const useCardStore = defineStore('cards', {
     state: () => ({
