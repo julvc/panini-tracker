@@ -297,7 +297,7 @@ const downloadBackup = () => {
 const getExportData = (type: 'duplicates' | 'missing') => {
   if (type === 'duplicates') {
     return {
-      list: store.duplicates,
+      list: [...store.duplicates].sort((a, b) => Number(a.id) - Number(b.id)),
       title: 'Repetidas',
       docTitle: 'Mis Cartas Repetidas - Adrenalyn XL',
       emptyMsg: 'No tienes cartas repetidas para exportar.',
@@ -307,7 +307,7 @@ const getExportData = (type: 'duplicates' | 'missing') => {
     }
   } else {
     return {
-      list: filteredCollection.value, // filteredCollection ya contiene las faltantes si la tab es 'missing'
+      list: [...filteredCollection.value].sort((a, b) => Number(a.id) - Number(b.id)),
       title: 'Faltantes',
       docTitle: 'Cartas que me faltan - Adrenalyn XL',
       emptyMsg: 'No tienes cartas faltantes en tu colección.',
@@ -338,6 +338,15 @@ const exportListXlsx = (type: 'duplicates' | 'missing') => {
   })
 
   const worksheet = XLSX.utils.json_to_sheet(data)
+  
+  // Ajustar anchos de columnas para mejor visualización
+  worksheet['!cols'] = [
+    { wch: 10 }, // ID
+    { wch: 35 }, // Nombre
+    { wch: 20 }, // Cantidad Extra / Diseño
+    { wch: 20 }  // Diseño
+  ]
+
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, meta.title)
   
@@ -372,8 +381,9 @@ const exportListPdf = (type: 'duplicates' | 'missing') => {
     startY: 20,
     head: head,
     body: tableData,
-    styles: { font: 'helvetica' },
-    headStyles: { fillColor: type === 'duplicates' ? [66, 133, 244] : [234, 67, 53] }
+    theme: 'grid', // Agrega las celdas/bordes visuales
+    styles: { font: 'helvetica', fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: type === 'duplicates' ? [66, 133, 244] : [234, 67, 53], textColor: [255, 255, 255] }
   })
   
   doc.save(`${meta.fileName}_${new Date().toISOString().slice(0, 10)}.pdf`)
