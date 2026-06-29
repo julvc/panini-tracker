@@ -16,6 +16,8 @@
     <div class="stats">
       <p>Cartas Totales: {{ store.totalCards }}</p>
       <p>Repetidas: {{ store.duplicates.length }}</p>
+    </div>
+
     <div class="bulk-actions" v-if="store.isAdmin">
       <h3>Carga Rápida y Configuración</h3>
       <div class="bulk-input-group">
