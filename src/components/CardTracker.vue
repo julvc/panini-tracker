@@ -2,14 +2,21 @@
   <div class="tracker-container">
     <header class="header">
       <h1>Adrenalyn XL</h1>
-      <div class="drive-buttons" v-if="store.isAdmin">
-        <button @click="triggerFileInput" class="btn-sync btn-restore">
-          Restaurar Backup
-        </button>
-        <button @click="downloadBackup" class="btn-sync">
-          Descargar Backup
-        </button>
-        <input type="file" ref="fileInput" @change="handleFileUpload" accept=".json" style="display: none" />
+      <div class="header-right">
+        <div class="header-profile">
+          <a href="mailto:jvarascontreras@gmail.com" title="Correo">✉️</a>
+          <a href="https://www.linkedin.com/in/julio-varas-b1228216b/" target="_blank" title="LinkedIn">💼</a>
+          <a href="https://github.com/julvc/panini-tracker" target="_blank" title="GitHub">💻</a>
+        </div>
+        <div class="drive-buttons" v-if="store.isAdmin">
+          <button @click="triggerFileInput" class="btn-sync btn-restore">
+            Restaurar Backup
+          </button>
+          <button @click="downloadBackup" class="btn-sync">
+            Descargar Backup
+          </button>
+          <input type="file" ref="fileInput" @change="handleFileUpload" accept=".json" style="display: none" />
+        </div>
       </div>
     </header>
 
@@ -152,7 +159,7 @@
       <div class="dev-name">Julio Varas</div>
       <div class="dev-links">
         <a href="mailto:jvarascontreras@gmail.com" class="dev-link">✉️ jvarascontreras@gmail.com</a>
-        <a href="https://linkedin.com/in/jvarascontreras" target="_blank" rel="noopener noreferrer" class="dev-link">💼 LinkedIn</a>
+        <a href="https://www.linkedin.com/in/julio-varas-b1228216b/" target="_blank" rel="noopener noreferrer" class="dev-link">💼 LinkedIn</a>
         <a href="https://github.com/julvc/panini-tracker" target="_blank" rel="noopener noreferrer" class="dev-link">💻 Mi Repositorio</a>
       </div>
     </footer>
@@ -650,6 +657,30 @@ const deleteCard = (id: string | number) => {
   border-bottom: 2px solid #eee;
   padding-bottom: 1rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.header-profile {
+  display: flex;
+  gap: 12px;
+}
+
+.header-profile a {
+  text-decoration: none;
+  font-size: 1.3rem;
+  transition: transform 0.2s;
+}
+
+.header-profile a:hover {
+  transform: scale(1.15);
 }
 
 .drive-buttons {
