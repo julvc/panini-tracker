@@ -16,27 +16,6 @@
     <div class="stats">
       <p>Cartas Totales: {{ store.totalCards }}</p>
       <p>Repetidas: {{ store.duplicates.length }}</p>
-    </div>
-
-    <!-- ACCIONES DE EXPORTACIÓN -->
-    <div class="share-actions" v-if="activeTab === 'duplicates' && store.duplicates.length > 0">
-      <p class="export-title">Exportar Repetidas</p>
-      <div class="buttons-row">
-        <button @click="exportListXlsx('duplicates')" class="btn-action btn-excel">📊 Excel (XLSX)</button>
-        <button @click="exportListPdf('duplicates')" class="btn-action btn-pdf">📕 PDF</button>
-        <button @click="shareList('duplicates')" class="btn-action btn-whatsapp">📲 Compartir</button>
-      </div>
-    </div>
-
-    <div class="share-actions" v-if="activeTab === 'missing' && filteredCollection.length > 0">
-      <p class="export-title">Exportar Faltantes</p>
-      <div class="buttons-row">
-        <button @click="exportListXlsx('missing')" class="btn-action btn-excel">📊 Excel (XLSX)</button>
-        <button @click="exportListPdf('missing')" class="btn-action btn-pdf">📕 PDF</button>
-        <button @click="shareList('missing')" class="btn-action btn-whatsapp">📲 Compartir</button>
-      </div>
-    </div>
-
     <div class="bulk-actions" v-if="store.isAdmin">
       <h3>Carga Rápida y Configuración</h3>
       <div class="bulk-input-group">
@@ -63,6 +42,25 @@
       <button @click="activeTab = 'duplicates'" :class="{ active: activeTab === 'duplicates' }" class="tab-btn">
         Repetidas
       </button>
+    </div>
+
+    <!-- ACCIONES DE EXPORTACIÓN -->
+    <div class="share-actions" v-if="activeTab === 'duplicates' && store.duplicates.length > 0">
+      <p class="export-title">Exportar Repetidas</p>
+      <div class="buttons-row">
+        <button @click="exportListXlsx('duplicates')" class="btn-action btn-excel">📊 Excel (XLSX)</button>
+        <button @click="exportListPdf('duplicates')" class="btn-action btn-pdf">📕 PDF</button>
+        <button @click="shareList('duplicates')" class="btn-action btn-whatsapp">📲 Compartir</button>
+      </div>
+    </div>
+
+    <div class="share-actions" v-if="activeTab === 'missing' && filteredCollection.length > 0">
+      <p class="export-title">Exportar Faltantes</p>
+      <div class="buttons-row">
+        <button @click="exportListXlsx('missing')" class="btn-action btn-excel">📊 Excel (XLSX)</button>
+        <button @click="exportListPdf('missing')" class="btn-action btn-pdf">📕 PDF</button>
+        <button @click="shareList('missing')" class="btn-action btn-whatsapp">📲 Compartir</button>
+      </div>
     </div>
 
     <!-- Paginador -->
