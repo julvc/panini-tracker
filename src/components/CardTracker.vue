@@ -2,7 +2,7 @@
   <div class="tracker-container">
     <header class="header">
       <h1>Adrenalyn XL</h1>
-      <div class="drive-buttons">
+      <div class="drive-buttons" v-if="store.isAdmin">
         <button @click="triggerFileInput" class="btn-sync btn-restore">
           Restaurar Backup
         </button>
@@ -146,6 +146,17 @@
         </div>
       </div>
     </div>
+
+    <!-- Firma del Desarrollador (Portafolio) -->
+    <footer class="developer-credits">
+      <div class="dev-name">Julio Varas</div>
+      <div class="dev-links">
+        <a href="mailto:jvarascontreras@gmail.com" class="dev-link">✉️ jvarascontreras@gmail.com</a>
+        <a href="https://linkedin.com/in/jvarascontreras" target="_blank" rel="noopener noreferrer" class="dev-link">💼 LinkedIn</a>
+        <a href="https://github.com/julvc/panini-tracker" target="_blank" rel="noopener noreferrer" class="dev-link">💻 Mi Repositorio</a>
+      </div>
+    </footer>
+
   </div>
 </template>
 <script setup lang="ts">
@@ -1097,4 +1108,37 @@ const deleteCard = (id: string | number) => {
 
 .btn-cancel { background-color: #e0e0e0; color: #333; }
 .btn-confirm { background-color: #ea4335; color: white; }
+
+/* Firma del desarrollador */
+.developer-credits {
+  margin-top: 40px;
+  padding: 20px;
+  text-align: center;
+  border-top: 2px dashed #ddd;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+.dev-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+}
+.dev-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+}
+.dev-link {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+.dev-link:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
 </style>
