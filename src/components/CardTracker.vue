@@ -153,7 +153,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useCardStore } from '../stores/cards'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 
 const store = useCardStore()
 
@@ -339,6 +339,19 @@ const exportListXlsx = (type: 'duplicates' | 'missing') => {
 
   const worksheet = XLSX.utils.json_to_sheet(data)
   
+  // Dar estilo a la cabecera (negrita y fondo celeste)
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "ADD8E6" } } // Celeste claro (LightBlue)
+  }
+  
+  Object.keys(worksheet).forEach(key => {
+    // Si la celda es de la fila 1 (A1, B1, C1...)
+    if (key.match(/^[A-Z]1$/)) {
+      worksheet[key].s = headerStyle
+    }
+  })
+
   // Ajustar anchos de columnas para mejor visualización
   worksheet['!cols'] = [
     { wch: 10 }, // ID
