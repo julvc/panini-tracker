@@ -18,11 +18,23 @@
       <p>Repetidas: {{ store.duplicates.length }}</p>
     </div>
 
-    <!-- NUEVA SECCIÓN DE ACCIONES PARA REPETIDAS -->
-    <div class="share-actions" v-if="store.duplicates.length > 0">
-      <button @click="exportDuplicatesXlsx" class="btn-action btn-excel">📊 Excel (XLSX)</button>
-      <button @click="exportDuplicatesPdf" class="btn-action btn-pdf">📕 Exportar PDF</button>
-      <button @click="shareDuplicates" class="btn-action btn-whatsapp">📲 Compartir</button>
+    <!-- ACCIONES DE EXPORTACIÓN -->
+    <div class="share-actions" v-if="activeTab === 'duplicates' && store.duplicates.length > 0">
+      <p class="export-title">Exportar Repetidas</p>
+      <div class="buttons-row">
+        <button @click="exportListXlsx('duplicates')" class="btn-action btn-excel">📊 Excel (XLSX)</button>
+        <button @click="exportListPdf('duplicates')" class="btn-action btn-pdf">📕 PDF</button>
+        <button @click="shareList('duplicates')" class="btn-action btn-whatsapp">📲 Compartir</button>
+      </div>
+    </div>
+
+    <div class="share-actions" v-if="activeTab === 'missing' && filteredCollection.length > 0">
+      <p class="export-title">Exportar Faltantes</p>
+      <div class="buttons-row">
+        <button @click="exportListXlsx('missing')" class="btn-action btn-excel">📊 Excel (XLSX)</button>
+        <button @click="exportListPdf('missing')" class="btn-action btn-pdf">📕 PDF</button>
+        <button @click="shareList('missing')" class="btn-action btn-whatsapp">📲 Compartir</button>
+      </div>
     </div>
 
     <div class="bulk-actions" v-if="store.isAdmin">
@@ -280,78 +292,116 @@ const downloadBackup = () => {
   URL.revokeObjectURL(url)
 }
 
-// --- NUEVO: Exportar Repetidas a Excel (XLSX) ---
-const exportDuplicatesXlsx = () => {
-  const duplicates = store.duplicates
-  if (duplicates.length === 0) {
-    showToast('No tienes cartas repetidas para exportar.', 'info')
+// --- Funciones de Exportación (Repetidas y Faltantes) ---
+
+const getExportData = (type: 'duplicates' | 'missing') => {
+  if (type === 'duplicates') {
+    return {
+      list: store.duplicates,
+      title: 'Repetidas',
+      docTitle: 'Mis Cartas Repetidas - Adrenalyn XL',
+      emptyMsg: 'No tienes cartas repetidas para exportar.',
+      fileName: 'repetidas_adrenalyn',
+      shareTitle: 'Mis Repetidas Adrenalyn XL',
+      shareIntro: '¡Hola! Estas son mis cartas repetidas de Adrenalyn XL:\n\n'
+    }
+  } else {
+    return {
+      list: filteredCollection.value, // filteredCollection ya contiene las faltantes si la tab es 'missing'
+      title: 'Faltantes',
+      docTitle: 'Cartas que me faltan - Adrenalyn XL',
+      emptyMsg: 'No tienes cartas faltantes en tu colección.',
+      fileName: 'faltantes_adrenalyn',
+      shareTitle: 'Cartas que me faltan Adrenalyn XL',
+      shareIntro: '¡Hola! Estas son las cartas que me faltan de Adrenalyn XL:\n\n'
+    }
+  }
+}
+
+const exportListXlsx = (type: 'duplicates' | 'missing') => {
+  const meta = getExportData(type)
+  if (meta.list.length === 0) {
+    showToast(meta.emptyMsg, 'info')
     return
   }
   
-  const data = duplicates.map(c => ({
-    ID: `#${c.id}`,
-    Nombre: c.name,
-    'Cantidad Extra': c.owned > 1 ? c.owned - 1 : 0,
-    Diseño: c.design || 'normal'
-  }))
+  const data = meta.list.map(c => {
+    const row: any = {
+      ID: `#${c.id}`,
+      Nombre: c.name,
+      Diseño: c.design || 'normal'
+    }
+    if (type === 'duplicates') {
+      row['Cantidad Extra'] = c.owned > 1 ? c.owned - 1 : 0
+    }
+    return row
+  })
 
   const worksheet = XLSX.utils.json_to_sheet(data)
   const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Repetidas")
+  XLSX.utils.book_append_sheet(workbook, worksheet, meta.title)
   
-  XLSX.writeFile(workbook, `repetidas_adrenalyn_${new Date().toISOString().slice(0, 10)}.xlsx`)
-  showToast('Archivo Excel generado exitosamente.', 'success')
+  XLSX.writeFile(workbook, `${meta.fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  showToast(`Archivo Excel de ${meta.title} generado exitosamente.`, 'success')
 }
 
-// --- NUEVO: Exportar Repetidas a PDF ---
-const exportDuplicatesPdf = () => {
-  const duplicates = store.duplicates
-  if (duplicates.length === 0) {
-    showToast('No tienes cartas repetidas para exportar.', 'info')
+const exportListPdf = (type: 'duplicates' | 'missing') => {
+  const meta = getExportData(type)
+  if (meta.list.length === 0) {
+    showToast(meta.emptyMsg, 'info')
     return
   }
   
   const doc = new jsPDF()
-  doc.text('Mis Cartas Repetidas - Adrenalyn XL', 14, 15)
+  doc.text(meta.docTitle, 14, 15)
   
-  const tableData = duplicates.map(c => [
-    `#${c.id}`, 
-    c.name, 
-    String(c.owned > 1 ? c.owned - 1 : 0),
-    c.design || 'normal'
-  ])
+  const head = type === 'duplicates' 
+    ? [['ID', 'Nombre', 'Cantidad Extra', 'Diseño']]
+    : [['ID', 'Nombre', 'Diseño']]
+
+  const tableData = meta.list.map(c => {
+    const row = [`#${c.id}`, c.name]
+    if (type === 'duplicates') {
+      row.push(String(c.owned > 1 ? c.owned - 1 : 0))
+    }
+    row.push(c.design || 'normal')
+    return row
+  })
   
   autoTable(doc, {
     startY: 20,
-    head: [['ID', 'Nombre', 'Cantidad Extra', 'Diseño']],
+    head: head,
     body: tableData,
     styles: { font: 'helvetica' },
-    headStyles: { fillColor: [66, 133, 244] }
+    headStyles: { fillColor: type === 'duplicates' ? [66, 133, 244] : [234, 67, 53] }
   })
   
-  doc.save(`repetidas_adrenalyn_${new Date().toISOString().slice(0, 10)}.pdf`)
-  showToast('Archivo PDF generado exitosamente.', 'success')
+  doc.save(`${meta.fileName}_${new Date().toISOString().slice(0, 10)}.pdf`)
+  showToast(`Archivo PDF de ${meta.title} generado exitosamente.`, 'success')
 }
 
-// --- NUEVO: Compartir con Web Share API ---
-const shareDuplicates = async () => {
-  const duplicates = store.duplicates
-  if (duplicates.length === 0) {
-    showToast('No tienes cartas repetidas para compartir.', 'info')
+const shareList = async (type: 'duplicates' | 'missing') => {
+  const meta = getExportData(type)
+  if (meta.list.length === 0) {
+    showToast(meta.emptyMsg, 'info')
     return
   }
   
-  let textContent = '¡Hola! Estas son mis cartas repetidas de Adrenalyn XL:\n\n'
-  duplicates.forEach(c => {
-    const extra = c.owned > 1 ? c.owned - 1 : 0
-    textContent += `▪️ #${c.id} ${c.name} (x${extra})\n`
+  let textContent = meta.shareIntro
+  meta.list.forEach(c => {
+    if (type === 'duplicates') {
+      const extra = c.owned > 1 ? c.owned - 1 : 0
+      textContent += `▪️ #${c.id} ${c.name} (x${extra})\n`
+    } else {
+      textContent += `▪️ #${c.id} ${c.name}\n`
+    }
   })
-  textContent += '\n¿Te sirve alguna para cambiar?'
+  textContent += type === 'duplicates' ? '\n¿Te sirve alguna para cambiar?' : '\n¿Tienes alguna para cambiar?'
   
   if (navigator.share) {
     try {
       await navigator.share({
-        title: 'Mis Repetidas Adrenalyn XL',
+        title: meta.shareTitle,
         text: textContent
       })
       showToast('¡Compartido con éxito!', 'success')
@@ -361,7 +411,6 @@ const shareDuplicates = async () => {
       }
     }
   } else {
-    // Fallback por si el navegador no soporta Web Share API (ej. PC)
     try {
       await navigator.clipboard.writeText(textContent)
       showToast('Texto copiado al portapapeles. ¡Pégalo donde quieras!', 'success')
@@ -594,9 +643,21 @@ const deleteCard = (id: string | number) => {
 
 /* Estilos para Compartir y Exportar */
 .share-actions {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+.export-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+.buttons-row {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
 }
